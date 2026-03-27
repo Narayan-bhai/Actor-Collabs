@@ -106,7 +106,7 @@ async function buildGraph() {
       actors: Array.from(graph.actorIndex.keys()),
       matrix: graph.adjMatrix
     },
-    500, // top 100 actors
+    200, // top 100 actors
     0    // only links with 2+ collaborations
   );
 }
