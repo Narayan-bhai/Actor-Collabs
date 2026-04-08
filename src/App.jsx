@@ -176,7 +176,12 @@ export default function App() {
     const isBright = (isGenreHL && matchesGenre) || isHL || isHovered;
     ctx.strokeStyle = isHovered ? color : isBright ? "#fff" : "#1b5e20";
     ctx.lineWidth = isBright ? 2.5 / globalScale : 1 / globalScale;
-    ctx.stroke();
+
+    if (isBright) {
+      ctx.strokeStyle = isHovered ? color : "#fff";
+      ctx.lineWidth = 2.5 / globalScale;
+      ctx.stroke();
+    }
 
     if (isHovered || globalScale > 3 || (isGenreHL && matchesGenre)) {
       const fs = Math.max(3, 9 / globalScale);
