@@ -1,124 +1,221 @@
 import express from "express";
 import fs from "fs";
 import cors from "cors";
-import path from "path";
 import csv from "csv-parser";
-import { fileURLToPath } from "url";
 
 const app = express();
 app.use(cors());
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const FILE_PATH = path.join(__dirname, "imdb_top_1000.csv");
+// ─── Preserved Datasets ────────────────────────────────────────────────
+// movieActors : movie  → [actor, ...]
+// movieData   : movie  → { poster, genre, rating, actors }
+// allMovieNames: string[]
 
-class Actor {
-  constructor(name) {
-    this.name = name;
-    this.movies = new Set();
-  }
-  addMovie(movie) {
-    this.movies.add(movie);
-  }
-}
+let movieActors = new Map();
+let movieData = new Map();
+let allMovieNames = [];
 
-class Graph {
-  constructor() {
-    this.actors = new Map();
-    this.actorIndex = new Map();
-    this.adjMatrix = [];
-  }
+// ─── Actor lookup (kept for recommend() scoring logic) ──────────────────
+// actorMovies : actor → Set<movie>
+// actorIndex  : actor → integer index (used only inside recommend())
 
-  addMovieToActor(actorName, movie) {
-    if (!this.actors.has(actorName)) {
-      this.actors.set(actorName, new Actor(actorName));
-    }
-    this.actors.get(actorName).addMovie(movie);
-  }
+let actorMovies = new Map();
+let actorIndex = new Map();
 
-  buildMatrixFast(rows) {
-    const actorNames = Array.from(this.actors.keys());
-    actorNames.forEach((name, i) => this.actorIndex.set(name, i));
-    const n = actorNames.length;
-    this.adjMatrix = Array.from({ length: n }, () => Array(n).fill(0));
+// ─── NEW: Movie-based graph structures ──────────────────────────────────
+// movieIndex  : movie → integer index into adjMatrix
+// adjMatrix   : movie × movie  (adjMatrix[i][j] = number of shared actors)
 
-    rows.forEach((row) => {
-      const actors = [row.Star1, row.Star2, row.Star3, row.Star4].filter(Boolean);
-      for (let i = 0; i < actors.length; i++) {
-        for (let j = i + 1; j < actors.length; j++) {
-          const a = this.actorIndex.get(actors[i]);
-          const b = this.actorIndex.get(actors[j]);
-          if (a !== undefined && b !== undefined) {
-            this.adjMatrix[a][b] += 1;
-            this.adjMatrix[b][a] += 1;
-          }
-        }
-      }
-    });
-  }
-}
+let movieIndex = new Map();
+let adjMatrix = [];
 
-// Filter top actors and strong links
-function filterGraph(graphData, maxActors = 100, minCollab = 2) {
-  const { actors, matrix } = graphData;
-
-  // compute degree for each actor
-  const degrees = actors.map((_, i) =>
-    matrix[i].reduce((sum, v) => sum + (v >= minCollab ? 1 : 0), 0)
-  );
-
-  const sortedIndexes = actors.map((_, i) => i)
-    .sort((a, b) => degrees[b] - degrees[a])
-    .slice(0, maxActors);
-
-  const filteredActors = sortedIndexes.map(i => actors[i]);
-  const filteredMatrix = sortedIndexes.map(i =>
-    sortedIndexes.map(j => matrix[i][j])
-  );
-
-  return { actors: filteredActors, matrix: filteredMatrix };
-}
-
-function parseCSVFile() {
-  return new Promise((resolve, reject) => {
+// ───────────────────────────────────────────────────────────────────────
+function loadCSV() {
+  return new Promise((resolve) => {
     const rows = [];
-    fs.createReadStream(FILE_PATH)
+    fs.createReadStream("imdb_top_1000.csv")
       .pipe(csv())
       .on("data", (row) => rows.push(row))
-      .on("end", () => resolve(rows))
-      .on("error", (err) => reject(err));
+      .on("end", () => resolve(rows));
   });
 }
 
+// ───────────────────────────────────────────────────────────────────────
 async function buildGraph() {
-  const graph = new Graph();
-  const rows = await parseCSVFile();
+  const rows = await loadCSV();
 
-  rows.forEach(row => {
+  // ── Pass 1: Collect movie metadata and actor↔movie relationships ──────
+  rows.forEach((row) => {
+    const movie = row.Series_Title;
     const actors = [row.Star1, row.Star2, row.Star3, row.Star4].filter(Boolean);
-    actors.forEach(actor => graph.addMovieToActor(actor, row.Series_Title));
+    const genre = row.Genre ? row.Genre.split(",")[0].trim() : "Unknown";
+    const poster = row.Poster_Link || "";
+    const rating = parseFloat(row.IMDB_Rating) || 0;
+
+    // Preserved datasets
+    movieActors.set(movie, actors);
+    movieData.set(movie, { poster, genre, rating, actors });
+    allMovieNames.push(movie);
+
+    // Build actorMovies (needed by recommend())
+    actors.forEach((actor) => {
+      if (!actorMovies.has(actor)) actorMovies.set(actor, new Set());
+      actorMovies.get(actor).add(movie);
+    });
   });
 
-  graph.buildMatrixFast(rows);
+  // ── Build actorIndex (needed by recommend()) ──────────────────────────
+  const actorList = Array.from(actorMovies.keys());
+  actorList.forEach((a, i) => actorIndex.set(a, i));
 
-  return filterGraph(
-    {
-      actors: Array.from(graph.actorIndex.keys()),
-      matrix: graph.adjMatrix
-    },
-    200, // top 100 actors
-    0    // only links with 2+ collaborations
-  );
+  // ── Pass 2: Build MOVIE adjacency matrix ─────────────────────────────
+  // Assign each movie an integer index
+  allMovieNames.forEach((movie, i) => movieIndex.set(movie, i));
+
+  const n = allMovieNames.length;
+
+  // Initialise n × n matrix with zeros
+  adjMatrix = Array.from({ length: n }, () => Array(n).fill(0));
+
+  // For every actor, connect all pairs of movies they appeared in.
+  // Increment adjMatrix[i][j] for each shared actor → edge weight = shared actors.
+  actorMovies.forEach((movies) => {
+    const movieList = Array.from(movies);
+    for (let i = 0; i < movieList.length; i++) {
+      for (let j = i + 1; j < movieList.length; j++) {
+        const a = movieIndex.get(movieList[i]);
+        const b = movieIndex.get(movieList[j]);
+        if (a !== undefined && b !== undefined) {
+          adjMatrix[a][b]++;
+          adjMatrix[b][a]++;
+        }
+      }
+    }
+  });
 }
 
-app.get("/matrix", async (req, res) => {
-  try {
-    const data = await buildGraph();
-    res.json(data);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error building graph");
+// ───────────────────────────────────────────────────────────────────────
+// recommend() still relies on actorMovies + actorIndex for collaborative
+// scoring — no changes needed here.
+function recommend(movie) {
+  const baseActors = movieActors.get(movie);
+  if (!baseActors) return [];
+
+  const scores = {};
+
+  baseActors.forEach((actor) => {
+    const idx = actorIndex.get(actor);
+
+    // +5 for every movie the same actor appeared in
+    actorMovies.get(actor).forEach((m) => {
+      if (m !== movie) scores[m] = (scores[m] || 0) + 5;
+    });
+
+    // Additional weight from actor–actor collaboration graph row
+    // (kept intact to preserve recommendation quality)
+    const actorList = Array.from(actorIndex.keys());
+    actorList.forEach((neighbor, j) => {
+      // Build a temporary actor adjMatrix row on the fly using actorIndex
+      // This mirrors the old behaviour without storing the actor matrix.
+      actorMovies.get(neighbor)?.forEach((m) => {
+        if (m !== movie) {
+          // Shared-movie count between baseActor and neighbor
+          const shared = [...(actorMovies.get(actor) || [])].filter((mv) =>
+            actorMovies.get(neighbor)?.has(mv)
+          ).length;
+          if (shared > 0) scores[m] = (scores[m] || 0) + shared;
+        }
+      });
+    });
+  });
+
+  return Object.entries(scores)
+    .map(([title, score]) => {
+      const data = movieData.get(title) || {};
+      return { title, score, poster: data.poster, genre: data.genre, rating: data.rating };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 12);
+}
+
+// ─── /matrix ────────────────────────────────────────────────────────────
+// Returns a Movie Similarity Network:
+//   nodes → { id: movieTitle, genre, rating, poster }
+//   links → { source: movieA, target: movieB, value: sharedActorCount }
+//
+// To keep the graph performant we cap at the top-N most-connected movies.
+app.get("/matrix", (req, res) => {
+  const MAX_NODES = 300; // tune as needed
+
+  // Compute connectivity degree for each movie (how many other movies it connects to)
+  const movieDegrees = allMovieNames.map((movie, i) => ({
+    movie,
+    degree: adjMatrix[i].reduce((sum, v) => sum + (v > 0 ? 1 : 0), 0),
+    index: i,
+  }));
+
+  // Sort by degree descending and pick the top MAX_NODES
+  movieDegrees.sort((a, b) => b.degree - a.degree);
+  const topMovies = movieDegrees.slice(0, MAX_NODES);
+  const topMovieSet = new Set(topMovies.map((m) => m.movie));
+
+  // Build node list — each node carries genre, rating, and poster
+  const nodes = topMovies.map(({ movie }) => {
+    const data = movieData.get(movie) || {};
+    return {
+      id: movie,
+      genre: data.genre || "Unknown",
+      rating: data.rating || 0,
+      poster: data.poster || "",
+    };
+  });
+
+  // Build edge list — only between movies that are both in topMovieSet
+  const links = [];
+  for (let i = 0; i < topMovies.length; i++) {
+    for (let j = i + 1; j < topMovies.length; j++) {
+      const idxA = topMovies[i].index;
+      const idxB = topMovies[j].index;
+      const sharedActors = adjMatrix[idxA][idxB];
+      if (sharedActors > 0) {
+        links.push({
+          source: topMovies[i].movie,
+          target: topMovies[j].movie,
+          value: sharedActors, // number of shared actors = edge thickness
+        });
+      }
+    }
   }
+
+  res.json({ nodes, links });
 });
 
-app.listen(5000, () => console.log("🚀 Server running on http://localhost:5000"));
+// ─── /recommend ──────────────────────────────────────────────────────────
+app.get("/recommend", (req, res) => {
+  res.json(recommend(req.query.movie));
+});
+
+// ─── /movies ─────────────────────────────────────────────────────────────
+app.get("/movies", (req, res) => {
+  res.json(allMovieNames);
+});
+
+// ─── /top-actors (preserved for any existing frontend usage) ─────────────
+app.get("/top-actors", (req, res) => {
+  const actorList = Array.from(actorIndex.keys());
+  const degrees = actorList.map((name, i) => ({
+    name,
+    degree: actorMovies.get(name)?.size || 0,
+    movieCount: actorMovies.get(name)?.size || 0,
+  }));
+  degrees.sort((a, b) => b.degree - a.degree);
+  res.json(degrees.slice(0, 10));
+});
+
+// ─── Start ───────────────────────────────────────────────────────────────
+app.listen(5000, async () => {
+  await buildGraph();
+  console.log("🚀 Backend running on port 5000");
+  console.log(`   Movies indexed : ${movieIndex.size}`);
+  console.log(`   Actors indexed : ${actorIndex.size}`);
+});
