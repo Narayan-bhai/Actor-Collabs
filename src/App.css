@@ -1,12 +1,14 @@
 /* ===== VARIABLES ===== */
 :root {
---green: #3cb3a5;
+--primary: #3cb3a5;
 
-/* derived */
---green-dark: color-mix(in srgb, var(--green) 75%, black);
---green-soft: color-mix(in srgb, var(--green) 40%, white);
+--primary-dark: color-mix(in srgb, var(--primary) 75%, black);
+--primary-soft: color-mix(in srgb, var(--primary) 40%, white);
+--primary-light: color-mix(in srgb, var(--primary) 20%, white);
+
+--secondary: #e1651d;
+--secondary-dark: color-mix(in srgb, var(--secondary) 75%, black);
 }
-
 
 /* ===== RESET ===== */
 
@@ -32,7 +34,7 @@ height: 100vh;
 }
 
 #header {
-background: var(--green);
+background: var(--primary);
 color: #fff;
 padding: 12px 16px;
 }
@@ -56,13 +58,13 @@ overflow: hidden;
 }
 
 .box {
-border: 1px solid var(--green);
+border: 1px solid var(--primary);
 padding: 10px;
 }
 
 .box h2 {
 font-size: 14px;
-color: var(--green-dark);
+color: var(--primary-dark);
 margin-bottom: 8px;
 }
 
@@ -70,28 +72,28 @@ margin-bottom: 8px;
 #movie-input {
 width: 100%;
 padding: 6px;
-border: 1px solid var(--green);
+border: 1px solid var(--primary);
 margin-bottom: 6px;
 }
 
 #rec-btn {
 width: 100%;
 padding: 8px;
-background: var(--green);
+background: var(--primary);
 color: #fff;
 border: none;
 cursor: pointer;
 }
 
 #rec-btn:disabled {
-background: var(--green-soft);
+background: var(--primary-soft);
 cursor: not-allowed;
 }
 
 /* ===== SUGGESTIONS ===== */
 #suggestions {
 list-style: none;
-border: 1px solid var(--green);
+border: 1px solid var(--primary);
 max-height: 120px;
 overflow-y: auto;
 }
@@ -102,22 +104,34 @@ cursor: pointer;
 }
 
 #suggestions li:hover {
-background: var(--green-soft);
+background: var(--primary-soft);
 }
 
 /* ===== RESULTS ===== */
+#results-box {
+display: flex;
+flex-direction: column;
+max-height: 40vh;
+}
+
 #rec-list {
 display: flex;
 flex-direction: column;
 gap: 6px;
+overflow-y: auto;
+flex: 1;
 }
 
 .rec-card {
 display: flex;
 gap: 6px;
 padding: 6px;
-border: 1px solid #ccc;
-background: #f9fbe7;
+border: 1px solid var(--primary);
+background: #fff;
+}
+
+.rec-card:hover {
+background: var(--primary-soft);
 }
 
 .rec-poster img,
@@ -130,6 +144,22 @@ height: 60px;
 font-size: 12px;
 }
 
+.rec-rating {
+color: var(--primary-dark);
+}
+
+/* ✅ SCORE = YELLOW */
+.rec-score {
+color: var(--secondary);
+font-weight: bold;
+}
+
+/* ✅ GENRE BADGE MATCHES THEME */
+.rec-genre {
+color: var(--primary-dark);
+padding: 2px 6px;
+font-size: 11px;
+}
 /* ===== LEGEND ===== */
 #legend-grid {
 display: grid;
@@ -174,22 +204,8 @@ display: block;
 #node-tooltip {
 position: fixed;
 background: #fff;
-border: 1px solid var(--green);
+border: 1px solid var(--primary);
 padding: 6px;
 font-size: 11px;
 pointer-events: none;
-}
-/* ===== RESULTS SCROLL FIX ===== */
-
-/* make results box flexible */
-#results-box {
-display: flex;
-flex-direction: column;
-max-height: 40vh; /* adjust if needed */
-}
-
-/* scroll only inside list */
-#rec-list {
-overflow-y: auto;
-flex: 1;
 }
