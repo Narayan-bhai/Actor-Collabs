@@ -3,27 +3,27 @@ import ForceGraph2D from "react-force-graph-2d";
 import "./App.css";
 
 const GENRE_COLORS = {
-  Action: "#c0392b",
-  Adventure: "#d35400",
-  Animation: "#16a085",
-  Biography: "#8e6b3e",
-  Comedy: "#b8860b",
-  Crime: "#6c3483",
-  Documentary: "#1a6b4a",
-  Drama: "#2471a3",
-  Family: "#cb4e8c",
-  Fantasy: "#7d3c98",
-  History: "#a04000",
-  Horror: "#943126",
-  Music: "#117a8b",
-  Mystery: "#4a235a",
-  Romance: "#a93226",
-  "Sci-Fi": "#1a5276",
-  Sport: "#1e8449",
-  Thriller: "#922b21",
-  War: "#616a6b",
-  Western: "#7e5109",
-  Unknown: "#888888",
+  Action: "#e74c3c",
+  Adventure: "#f39c12",
+  Animation: "#1abc9c",
+  Biography: "#a1887f",
+  Comedy: "#f1c40f",
+  Crime: "#8e44ad",
+  Documentary: "#27ae60",
+  Drama: "#3498db",
+  Family: "#ff6fb5",
+  Fantasy: "#9b59b6",
+  History: "#d35400",
+  Horror: "#c0392b",
+  Music: "#00bcd4",
+  Mystery: "#6c5ce7",
+  Romance: "#ff4d6d",
+  "Sci-Fi": "#00a8ff",
+  Sport: "#2ecc71",
+  Thriller: "#e67e22",
+  War: "#7f8c8d",
+  Western: "#a97142",
+  Unknown: "#95a5a6",
 };
 
 function genreColor(genre) {
@@ -44,13 +44,17 @@ export default function App() {
   const [visibleGenres, setVisibleGenres] = useState([]);
   const [selectedGenre, setSelectedGenre] = useState(null);
   const selectedGenreRef = useRef(null);
-
+  const [renderTick, setRenderTick] = useState(0);
+ 
   const updateSelectedGenre = useCallback((genre) => {
-    selectedGenreRef.current = genre;
-    setSelectedGenre(genre);
-    highlightNodesRef.current = new Set();
-    highlightLinksRef.current = new Set();
-  }, []);
+  selectedGenreRef.current = genre;
+  setSelectedGenre(genre);
+
+  highlightNodesRef.current = new Set();
+  highlightLinksRef.current = new Set();
+
+  setRenderTick(t => t + 1);
+}, []);
 
   const highlightNodesRef = useRef(new Set());
   const highlightLinksRef = useRef(new Set());
@@ -406,6 +410,7 @@ export default function App() {
               <div id="graph-loading">Loading graph...</div>
             ) : graphData ? (
               <ForceGraph2D
+                key={renderTick}
                 ref={graphRef}
                 graphData={graphData}
                 nodeCanvasObject={nodeCanvasObject}
