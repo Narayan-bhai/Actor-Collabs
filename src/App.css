@@ -1,3 +1,13 @@
+/* ===== VARIABLES ===== */
+:root {
+--green: #3cb3a5;
+
+/* derived */
+--green-dark: color-mix(in srgb, var(--green) 75%, black);
+--green-soft: color-mix(in srgb, var(--green) 40%, white);
+}
+
+
 /* ===== RESET ===== */
 
 * {
@@ -11,7 +21,7 @@ font-family: Arial, sans-serif;
 background: #f0f0f0;
 color: #111;
 font-size: 14px;
-overflow: hidden; /* remove global scroll */
+overflow: hidden;
 }
 
 /* ===== LAYOUT ===== */
@@ -22,7 +32,7 @@ height: 100vh;
 }
 
 #header {
-background: #2e7d32;
+background: var(--green);
 color: #fff;
 padding: 12px 16px;
 }
@@ -42,17 +52,17 @@ padding: 12px;
 display: flex;
 flex-direction: column;
 gap: 12px;
-overflow: hidden; /* remove scroll */
+overflow: hidden;
 }
 
 .box {
-border: 1px solid #2e7d32;
+border: 1px solid var(--green);
 padding: 10px;
 }
 
 .box h2 {
 font-size: 14px;
-color: #1b5e20;
+color: var(--green-dark);
 margin-bottom: 8px;
 }
 
@@ -60,28 +70,28 @@ margin-bottom: 8px;
 #movie-input {
 width: 100%;
 padding: 6px;
-border: 1px solid #2e7d32;
+border: 1px solid var(--green);
 margin-bottom: 6px;
 }
 
 #rec-btn {
 width: 100%;
 padding: 8px;
-background: #2e7d32;
+background: var(--green);
 color: #fff;
 border: none;
 cursor: pointer;
 }
 
 #rec-btn:disabled {
-background: #a5d6a7;
+background: var(--green-soft);
 cursor: not-allowed;
 }
 
 /* ===== SUGGESTIONS ===== */
 #suggestions {
 list-style: none;
-border: 1px solid #2e7d32;
+border: 1px solid var(--green);
 max-height: 120px;
 overflow-y: auto;
 }
@@ -92,7 +102,7 @@ cursor: pointer;
 }
 
 #suggestions li:hover {
-background: #e8f5e9;
+background: var(--green-soft);
 }
 
 /* ===== RESULTS ===== */
@@ -164,8 +174,22 @@ display: block;
 #node-tooltip {
 position: fixed;
 background: #fff;
-border: 1px solid #2e7d32;
+border: 1px solid var(--green);
 padding: 6px;
 font-size: 11px;
 pointer-events: none;
+}
+/* ===== RESULTS SCROLL FIX ===== */
+
+/* make results box flexible */
+#results-box {
+display: flex;
+flex-direction: column;
+max-height: 40vh; /* adjust if needed */
+}
+
+/* scroll only inside list */
+#rec-list {
+overflow-y: auto;
+flex: 1;
 }
