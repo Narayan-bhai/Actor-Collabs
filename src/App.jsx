@@ -288,8 +288,7 @@ export default function App() {
 
       {/* ── header ── */}
       <div id="header">
-        <h1>🎬 Movie Recommender</h1>
-        <p>Based on actor collaboration network (IMDb Top 1000)</p>
+        <h1>Movie Recommender</h1>
       </div>
 
       <div id="main">
@@ -353,22 +352,6 @@ export default function App() {
             </div>
           )}
 
-          {/* ── info box ── */}
-          {recs.length === 0 && !loading && (
-            <div className="box" id="info-box">
-              <h2>How it works</h2>
-              <ul>
-                <li>Type a movie name above</li>
-                <li>The system finds actors from that movie</li>
-                <li>It scores other movies based on shared actors</li>
-                <li>Top matches are shown as recommendations</li>
-              </ul>
-              <p style={{ marginTop: 12, color: "#555", fontSize: 13 }}>
-                Dataset: IMDb Top 1000 movies<br />
-                Graph: top 300 movies, connected by shared actors
-              </p>
-            </div>
-          )}
 
           {/* ── genre legend / filter ── */}
           {visibleGenres.length > 0 && (
@@ -410,13 +393,6 @@ export default function App() {
 
         {/* ── graph panel ── */}
         <div id="graph-panel">
-          <div id="graph-header">
-            <strong>Movie Similarity Graph</strong>
-            <span id="graph-hint">
-              Scroll to zoom &nbsp;|&nbsp; Click node to highlight neighbors &nbsp;|&nbsp;
-              Click genre to filter &nbsp;|&nbsp; Click bg to reset
-            </span>
-          </div>
 
           <div
             id="graph-wrap"
@@ -449,11 +425,6 @@ export default function App() {
             )}
           </div>
 
-          <div id="graph-legend-bar">
-            <span className="legend-dot-bar"></span> Movie node (size = connections) &nbsp;&nbsp;
-            <span className="legend-line-bar"></span> Share actors &nbsp;&nbsp;
-            <span style={{ color: "#f57f17" }}>■</span> Highlighted link
-          </div>
         </div>
 
       </div>
@@ -473,11 +444,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-      {/* ── footer ── */}
-      <div id="footer">
-        Movie Similarity Network &mdash; Built with React + Node.js &mdash; Dataset: IMDb Top 1000
-      </div>
 
     </div>
   );
