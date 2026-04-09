@@ -22,6 +22,10 @@ let allMovieNames = [];
 let actorMovies = new Map();
 let actorIndex = new Map();
 
+// ─── Director lookup ────────────────────────────────────────────────────
+// directorMovies : director → Set<movie>
+let directorMovies = new Map();
+
 // ─── NEW: Movie-based graph structures ──────────────────────────────────
 // movieIndex  : movie → integer index into adjMatrix
 // adjMatrix   : movie × movie  (adjMatrix[i][j] = number of shared actors)
@@ -51,10 +55,11 @@ async function buildGraph() {
     const genre = row.Genre ? row.Genre.split(",")[0].trim() : "Unknown";
     const poster = row.Poster_Link || "";
     const rating = parseFloat(row.IMDB_Rating) || 0;
+    const director = row.Director || "";
 
     // Preserved datasets
     movieActors.set(movie, actors);
-    movieData.set(movie, { poster, genre, rating, actors });
+    movieData.set(movie, { poster, genre, rating, actors, director });
     allMovieNames.push(movie);
 
     // Build actorMovies (needed by recommend())
@@ -62,6 +67,12 @@ async function buildGraph() {
       if (!actorMovies.has(actor)) actorMovies.set(actor, new Set());
       actorMovies.get(actor).add(movie);
     });
+
+    // Build directorMovies
+    if (director) {
+      if (!directorMovies.has(director)) directorMovies.set(director, new Set());
+      directorMovies.get(director).add(movie);
+    }
   });
 
   // ── Build actorIndex (needed by recommend()) ──────────────────────────
@@ -88,6 +99,22 @@ async function buildGraph() {
         if (a !== undefined && b !== undefined) {
           adjMatrix[a][b]++;
           adjMatrix[b][a]++;
+        }
+      }
+    }
+  });
+
+  // For every director, connect all pairs of their movies.
+  // Each shared director adds 2 to the edge weight (a strong signal).
+  directorMovies.forEach((movies) => {
+    const movieList = Array.from(movies);
+    for (let i = 0; i < movieList.length; i++) {
+      for (let j = i + 1; j < movieList.length; j++) {
+        const a = movieIndex.get(movieList[i]);
+        const b = movieIndex.get(movieList[j]);
+        if (a !== undefined && b !== undefined) {
+          adjMatrix[a][b] += 2;
+          adjMatrix[b][a] += 2;
         }
       }
     }
@@ -129,6 +156,14 @@ function recommend(movie) {
     });
   });
 
+  // +8 bonus for every movie by the same director (strong thematic signal)
+  const baseDirector = movieData.get(movie)?.director;
+  if (baseDirector && directorMovies.has(baseDirector)) {
+    directorMovies.get(baseDirector).forEach((m) => {
+      if (m !== movie) scores[m] = (scores[m] || 0) + 8;
+    });
+  }
+
   return Object.entries(scores)
     .map(([title, score]) => {
       const data = movieData.get(title) || {};
@@ -159,7 +194,7 @@ app.get("/matrix", (req, res) => {
   const topMovies = movieDegrees.slice(0, MAX_NODES);
   const topMovieSet = new Set(topMovies.map((m) => m.movie));
 
-  // Build node list — each node carries genre, rating, and poster
+  // Build node list — each node carries genre, rating, poster, and director
   const nodes = topMovies.map(({ movie }) => {
     const data = movieData.get(movie) || {};
     return {
@@ -167,6 +202,7 @@ app.get("/matrix", (req, res) => {
       genre: data.genre || "Unknown",
       rating: data.rating || 0,
       poster: data.poster || "",
+      director: data.director || "Unknown",
     };
   });
 
