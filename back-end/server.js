@@ -107,45 +107,58 @@ async function buildGraph() {
 
 function recommend(movie) {
   if (!movieIndex.has(movie)) return [];
+
   const baseIndex = movieIndex.get(movie);
-  const baseActors = new Set(movieActors.get(movie));
-  const baseDirector = movieData.get(movie)?.director;
-  const scores = {};
-  const visited = new Set([baseIndex]);
-  const queue = [baseIndex];
   const n = adjMatrix.length;
 
+  const scores = new Array(n).fill(0);
+  const visited = new Set();
+
+  scores[baseIndex] = 10;
+
+  const queue = [{ index: baseIndex, score: 10, depth: 0 }];
+  const maxDepth = 3;
+
   while (queue.length) {
-    const i = queue.shift();
+    const { index: i, score, depth } = queue.shift();
+    if (depth >= maxDepth) continue;
+
     for (let j = 0; j < n; j++) {
-      if (adjMatrix[i][j] > 0 && !visited.has(j)) {
-        visited.add(j);
-        const m = allMovieNames[j];
-        let score = 0;
-        const actors = movieActors.get(m) || [];
-        actors.forEach((actor) => {
-          if (baseActors.has(actor)) score += 4;
-        });
+      if (adjMatrix[i][j] > 0) {
+        const currScore = parseInt(score / (depth+1));
 
-        if (movieData.get(m)?.director === baseDirector) {
-          score += 6;
-        }
+        scores[j] += currScore;
 
-        if (score > 0) {
-          scores[m] = (scores[m] || 0) + score;
-          queue.push(j);
+        if (!visited.has(j)) {
+          visited.add(j);
+          queue.push({
+            index: j,
+            score: currScore,
+            depth: depth + 1
+          });
         }
       }
     }
   }
 
-  return  Object.entries(scores)
-          .map(([title, score]) => {
-            const data = movieData.get(title) || {};
-            return { title, score, poster: data.poster, genre: data.genre, rating: data.rating };
-          })
-          .sort((a, b) => b.score - a.score)
-          .slice(0, 12);
+  return scores
+    .map((score, i) => {
+      if (i === baseIndex) return null;
+
+      const title = allMovieNames[i];
+      const data = movieData.get(title) || {};
+
+      return {
+        title,
+        score: Number(score.toFixed(3)),
+        poster: data.poster,
+        genre: data.genre,
+        rating: data.rating,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 12);
 }
 app.get("/matrix", (req, res) => {
   const MAX_NODES = 300;
